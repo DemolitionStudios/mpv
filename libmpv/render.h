@@ -284,6 +284,9 @@ void mpv_render_context_set_update_callback(mpv_render_context *ctx,
  */
 int mpv_render_context_render(mpv_render_context *ctx, mpv_render_param *params);
 
+// New!
+int mpv_render_context_get_native_texture(mpv_render_context *ctx, void** texture_handle, void** shader_resource_view_handle);
+
 /**
  * Tell the renderer that a frame was flipped at the given time. This is
  * optional, but can help the player to achieve better timing.
