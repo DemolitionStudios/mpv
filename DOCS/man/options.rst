@@ -912,6 +912,20 @@ Video
     Deprecated. Use ``--hwdec-image-format`` if you really need this. If both
     are specified, ``--hwdec-image-format`` wins.
 
+``--cuda-decode-device=<auto|0..>``
+    Choose the GPU device used for decoding when using the ``cuda`` hwdec.
+
+    By default, the device that is being used to provide OpenGL output will
+    also be used for decoding (and in the vast majority of cases, only one
+    GPU will be present).
+
+    Note that when using the ``cuda-copy`` hwdec, a different option must be
+    passed: ``--vd-lavc-o=gpu=<0..>``.
+
+``--vaapi-device=<device file>``
+    Choose the DRM device for ``vaapi-copy``. This should be the path to a
+    DRM device file. (Default: ``/dev/dri/renderD128``)
+
 ``--panscan=<0.0-1.0>``
     Enables pan-and-scan functionality (cropping the sides of e.g. a 16:9
     video to make it fit a 4:3 display without black bands). The range
@@ -1527,9 +1541,10 @@ Audio
             changes, the audio device is closed and reopened. This means that
             you will normally get gapless audio with files that were encoded
             using the same settings, but might not be gapless in other cases.
-            (Unlike with ``yes``, you don't have to worry about corner cases
-            like the first file setting a very low quality output format, and
-            ruining the playback of higher quality files that follow.)
+            The exact conditions under which the audio device is kept open is
+            an implementation detail, and can change from version to version.
+            Currently, the device is kept even if the sample format changes,
+            but the sample formats are convertible.
 
     .. note::
 
@@ -4133,6 +4148,20 @@ ALSA audio output options
     or it will work only for files which use the layout implicit to your
     ALSA device).
 
+``--alsa-buffer-time=<microseconds>``
+    Set the requested buffer time in microseconds. A value of 0 skips requesting
+    anything from the ALSA API. This and the ``--alsa-periods`` option uses the
+    ALSA ``near`` functions to set the requested parameters. If doing so results
+    in an empty configuration set, setting these parameters is skipped.
+
+    Both options control the buffer size. A low buffer size can lead to higher
+    CPU usage and audio dropouts, while a high buffer size can lead to higher
+    latency in volume changes and other filtering.
+
+``--alsa-periods=<number>``
+    Number of periods requested from the ALSA API. See ``--alsa-buffer-time``
+    for further remarks.
+
 
 GPU renderer options
 -----------------------
@@ -5373,16 +5402,6 @@ The following video options are currently all specific to ``--vo=gpu`` and
     NOTE: This is not cleaned automatically, so old, unused cache files may
     stick around indefinitely.
 
-``--cuda-decode-device=<auto|0..>``
-    Choose the GPU device used for decoding when using the ``cuda`` hwdec.
-
-    By default, the device that is being used to provide OpenGL output will
-    also be used for decoding (and in the vast majority of cases, only one
-    GPU will be present).
-
-    Note that when using the ``cuda-copy`` hwdec, a different option must be
-    passed: ``--vd-lavc-o=gpu=<0..>``.
-
 Miscellaneous
 -------------
 
@@ -5646,6 +5665,8 @@ Miscellaneous
           both tracks need to have the same width, or filter initialization
           will fail (you can add ``scale`` filters before the ``vstack`` filter
           to fix the size).
+          To load a video track from another file, you can use
+          ``--external-file=other.mkv``.
         - ``--lavfi-complex='[aid1] asplit [t1] [ao] ; [t1] showvolume [t2] ; [vid1] [t2] overlay [vo]'``
           Play audio track 1, and overlay the measured volume for each speaker
           over video track 1.

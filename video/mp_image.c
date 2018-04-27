@@ -305,7 +305,7 @@ static void ref_buffer(bool *ok, AVBufferRef **dst)
     if (*dst) {
         *dst = av_buffer_ref(*dst);
         if (!*dst)
-            ok = false;
+            *ok = false;
     }
 }
 
@@ -478,8 +478,7 @@ static void mp_image_copy_cb(struct mp_image *dst, struct mp_image *src,
         memcpy_pic_cb(dst->planes[n], src->planes[n], line_bytes, plane_h,
                       dst->stride[n], src->stride[n], cpy);
     }
-    // Watch out for AV_PIX_FMT_FLAG_PSEUDOPAL retardation
-    if ((dst->fmt.flags & MP_IMGFLAG_PAL) && dst->planes[1] && src->planes[1])
+    if (dst->fmt.flags & MP_IMGFLAG_PAL)
         memcpy(dst->planes[1], src->planes[1], AVPALETTE_SIZE);
 }
 
@@ -509,6 +508,7 @@ void mp_image_copy_attributes(struct mp_image *dst, struct mp_image *src)
     dst->params.color = src->params.color;
     dst->params.chroma_location = src->params.chroma_location;
     dst->params.spherical = src->params.spherical;
+    dst->nominal_fps = src->nominal_fps;
     // ensure colorspace consistency
     if (mp_image_params_get_forced_csp(&dst->params) !=
         mp_image_params_get_forced_csp(&src->params))

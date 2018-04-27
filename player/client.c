@@ -452,16 +452,16 @@ static void mp_destroy_client(mpv_handle *ctx, bool terminate)
         mpctx->stop_play = PT_QUIT;
         mp_dispatch_unlock(mpctx->dispatch);
 
-        // Stop the core thread.
+        pthread_t playthread;
+        mp_dispatch_run(mpctx->dispatch, get_thread, &playthread);
+
+        // Ask the core thread to stop.
         pthread_mutex_lock(&clients->lock);
         clients->terminate_core_thread = true;
         pthread_mutex_unlock(&clients->lock);
         mp_wakeup_core(mpctx);
 
         // Blocking wait for all clients and core thread to terminate.
-        pthread_t playthread;
-        mp_dispatch_run(mpctx->dispatch, get_thread, &playthread);
-
         pthread_join(playthread, NULL);
 
         mp_destroy(mpctx);
@@ -578,6 +578,7 @@ int mpv_initialize(mpv_handle *ctx)
 {
     lock_core(ctx);
     int res = mp_initialize(ctx->mpctx, NULL) ? MPV_ERROR_INVALID_PARAMETER : 0;
+    mp_wakeup_core(ctx->mpctx);
     unlock_core(ctx);
     return res;
 }
@@ -728,7 +729,7 @@ void mp_client_broadcast_event(struct MPContext *mpctx, int event, void *data)
 
 // If client_name == NULL, then broadcast and free the event.
 int mp_client_send_event(struct MPContext *mpctx, const char *client_name,
-                         int event, void *data)
+                         uint64_t reply_userdata, int event, void *data)
 {
     if (!client_name) {
         mp_client_broadcast_event(mpctx, event, data);
@@ -742,6 +743,7 @@ int mp_client_send_event(struct MPContext *mpctx, const char *client_name,
     struct mpv_event event_data = {
         .event_id = event,
         .data = data,
+        .reply_userdata = reply_userdata,
     };
 
     pthread_mutex_lock(&clients->lock);
@@ -773,7 +775,7 @@ int mp_client_send_event_dup(struct MPContext *mpctx, const char *client_name,
     };
 
     dup_event_data(&event_data);
-    return mp_client_send_event(mpctx, client_name, event, event_data.data);
+    return mp_client_send_event(mpctx, client_name, 0, event, event_data.data);
 }
 
 int mpv_request_event(mpv_handle *ctx, mpv_event_id event, int enable)
@@ -1558,6 +1560,23 @@ static bool gen_property_change_event(struct mpv_handle *ctx)
     return false;
 }
 
+int mpv_hook_add(mpv_handle *ctx, uint64_t reply_userdata,
+                 const char *name, int priority)
+{
+    lock_core(ctx);
+    mp_hook_add(ctx->mpctx, ctx->name, name, reply_userdata, priority, false);
+    unlock_core(ctx);
+    return 0;
+}
+
+int mpv_hook_continue(mpv_handle *ctx, uint64_t id)
+{
+    lock_core(ctx);
+    int r = mp_hook_continue(ctx->mpctx, ctx->name, id);
+    unlock_core(ctx);
+    return r;
+}
+
 int mpv_load_config_file(mpv_handle *ctx, const char *filename)
 {
     int flags = ctx->mpctx->initialized ? M_SETOPT_RUNTIME : 0;
@@ -1708,6 +1727,7 @@ static const char *const event_table[] = {
     [MPV_EVENT_PROPERTY_CHANGE] = "property-change",
     [MPV_EVENT_CHAPTER_CHANGE] = "chapter-change",
     [MPV_EVENT_QUEUE_OVERFLOW] = "event-queue-overflow",
+    [MPV_EVENT_HOOK] = "hook",
 };
 
 const char *mpv_event_name(mpv_event_id event)
@@ -1829,6 +1849,9 @@ int mpv_opengl_cb_init_gl(mpv_opengl_cb_context *ctx, const char *exts,
             .get_proc_address_ctx = get_proc_address_ctx,
             .extra_exts = exts,
         }},
+        // Hack for explicit legacy hwdec loading. We really want to make it
+        // impossible for proper render API users to trigger this.
+        {(mpv_render_param_type)-1, ctx->client_api->mpctx->global},
         {0}
     };
     int err = mpv_render_context_create(&ctx->client_api->render_context,

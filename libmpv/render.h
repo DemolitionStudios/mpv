@@ -152,6 +152,20 @@ typedef enum mpv_render_param_type {
      * This can be used for automatic gamma correction.
      */
     MPV_RENDER_PARAM_AMBIENT_LIGHT = 7,
+    /**
+     * X11 Display, sometimes used for hwdec. Valid for
+     * mpv_render_context_create(). The Display must stay valid for the lifetime
+     * of the mpv_render_context.
+     * Type: Display*
+     */
+    MPV_RENDER_PARAM_X11_DISPLAY = 8,
+    /**
+     * Wayland display, sometimes used for hwdec. Valid for
+     * mpv_render_context_create(). The wl_display must stay valid for the
+     * lifetime of the mpv_render_context.
+     * Type: struct wl_display*
+     */
+    MPV_RENDER_PARAM_WL_DISPLAY = 9,
 } mpv_render_param_type;
 
 /**
@@ -181,8 +195,8 @@ typedef enum mpv_render_param_type {
  * will not write to the params array or any data pointed to it.
  *
  * As a convention, parameter arrays are always terminated by type==0. There
- * is no specific order of the parameters required. The order of fields is
- * guaranteed (even after ABI changes).
+ * is no specific order of the parameters required. The order of the 2 fields in
+ * this struct is guaranteed (even after ABI changes).
  */
 typedef struct mpv_render_param {
     enum mpv_render_param_type type;

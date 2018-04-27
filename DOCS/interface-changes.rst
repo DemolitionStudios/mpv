@@ -20,6 +20,7 @@ Interface changes
 ::
 
  --- mpv 0.29.0 ---
+    - drop --opensles-sample-rate, as --audio-samplerate should be used if desired
     - drop deprecated --videotoolbox-format, --ff-aid, --ff-vid, --ff-sid,
       --ad-spdif-dtshd, --softvol options
     - fix --external-files: strictly never select any tracks from them, unless
@@ -57,15 +58,17 @@ Interface changes
           between PCM and AC3 output, the audio output won't be reconfigured,
           and audio playback will fail due to libswresample being unable to
           convert between PCM and AC3 (Note: the responsible developer didn't
-          give a shit)
-        - inserting a filter that changes the output channel layout will not
+          give a shit. Later changes might have improved or worsened this.)
+        - inserting a filter that changes the output sample format will not
           reconfigure the AO - you need to run an additional "ao-reload"
           command to force this if you want that
         - using "strong" gapless audio (--gapless-audio=yes) can fail if the
           audio formats are not convertible (such as switching between PCM and
           AC3 passthrough)
         - if filters do not pass through PTS values correctly, A/V sync can
-          result over time
+          result over time. Some libavfilter filters are known to be affected by
+          this, such as af_loudnorm, which can desync over time, depending on
+          how the audio track was muxed (af_lavfi's fix-pts suboption can help).
     - remove out-format sub-parameter from "format" audio filter (no replacement)
     - --lavfi-complex now requires uniquely named filter pads. In addition,
       unconnected filter pads are not allowed anymore (that means every filter
@@ -80,6 +83,17 @@ Interface changes
       certain unreliable video metadata. Also flip the defaults of all builtin
       HW deinterlace filters to always deinterlace.
     - change vf_vavpp default to use the best deinterlace algorithm by default
+    - remove a compatibility hack that allowed CLI aliases to be set as property
+      (such as "sub-file"), deprecated in mpv 0.26.0
+    - deprecate the old command based hook API, and introduce a proper C API
+      (the high level Lua API for this does not change)
+    - rename the the lua-settings/ config directory to script-opts/
+    - the way the player waits for scripts getting loaded changes slightly. Now
+      scripts are loaded in parallel, and block the player from continuing
+      playback only in the player initialization phase. It could change again in
+      the future. (This kind of waiting was always a feature to prevent that
+      playback is started while scripts are only half-loaded.)
+    - deprecate --ovoffset, --oaoffset, --ovfirst, --oafirst
  --- mpv 0.28.0 ---
     - rename --hwdec=mediacodec option to mediacodec-copy, to reflect
       conventions followed by other hardware video decoding APIs

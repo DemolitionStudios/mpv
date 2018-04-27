@@ -110,10 +110,21 @@ Available audio output drivers are:
     exclusive mode (bypasses the sound server).
 
 ``openal``
-    Experimental OpenAL audio output driver
+    OpenAL audio output driver
 
-    .. note:: This driver is not very useful. Playing multi-channel audio with
-              it is slow.
+    ``--openal-num-buffers=<2-128>``
+        Specify the number of audio buffers to use. Lower values are better for
+        lower CPU usage. Default: 4.
+
+    ``--openal-num-samples=<256-32768>``
+        Specify the number of complete samples to use for each buffer. Higher
+        values are better for lower CPU usage. Default: 8192.
+
+    ``--openal-direct-channels=<yes|no>``
+        Enable OpenAL Soft's direct channel extension when available to avoid
+        tinting the sound with ambisonics or HRTF.
+        Channels are dropped when when they are not available as downmixing
+        will be disabled. Default: no.
 
 ``pulse``
     PulseAudio audio output driver
@@ -128,7 +139,7 @@ Available audio output drivers are:
         Set the audio buffer size in milliseconds. A higher value buffers
         more data, and has a lower probability of buffer underruns. A smaller
         value makes the audio stream react faster, e.g. to playback speed
-        changes. Default: 250.
+        changes.
 
     ``--pulse-latency-hacks=<yes|no>``
         Enable hacks to workaround PulseAudio timing bugs (default: no). If
