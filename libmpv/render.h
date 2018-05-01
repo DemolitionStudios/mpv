@@ -166,12 +166,19 @@ typedef enum mpv_render_param_type {
      * Type: struct wl_display*
      */
     MPV_RENDER_PARAM_WL_DISPLAY = 9,
+    /**
+    * Required parameters for initializing the D3D11 renderer. Valid for
+    * mpv_render_context_create().
+    * Type: mpv_d3d11_init_params*
+    */
+    MPV_RENDER_PARAM_D3D11_INIT_PARAMS = 100,
 } mpv_render_param_type;
 
 /**
  * Predefined values for MPV_RENDER_PARAM_API_TYPE.
  */
 #define MPV_RENDER_API_TYPE_OPENGL "opengl"
+#define MPV_RENDER_API_TYPE_D3D11  "d3d11"
 
 /**
  * Used to pass arbitrary parameters to some mpv_render_* functions. The

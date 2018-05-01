@@ -23,6 +23,7 @@
 #include "video/out/gpu/d3d11_helpers.h"
 #include "video/out/gpu/spirv.h"
 #include "video/out/w32_common.h"
+#include "context.h"
 #include "ra_d3d11.h"
 
 struct d3d11_opts {
