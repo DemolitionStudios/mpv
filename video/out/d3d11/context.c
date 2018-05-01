@@ -121,7 +121,7 @@ static int d3d11_color_depth(struct ra_swapchain *sw)
     return 8;
 }
 
-static bool d3d11_start_frame(struct ra_swapchain *sw, struct ra_fbo *out_fbo)
+bool d3d11_start_frame(struct ra_swapchain *sw, struct ra_fbo *out_fbo)
 {
     struct priv *p = sw->priv;
 
@@ -135,7 +135,7 @@ static bool d3d11_start_frame(struct ra_swapchain *sw, struct ra_fbo *out_fbo)
     return true;
 }
 
-static bool d3d11_submit_frame(struct ra_swapchain *sw,
+bool d3d11_submit_frame(struct ra_swapchain *sw,
                                const struct vo_frame *frame)
 {
     ra_d3d11_flush(sw->ctx->ra);
@@ -158,7 +158,7 @@ static int d3d11_control(struct ra_ctx *ctx, int *events, int request, void *arg
     return ret;
 }
 
-static void d3d11_uninit(struct ra_ctx *ctx)
+void d3d11_uninit(struct ra_ctx *ctx)
 {
     struct priv *p = ctx->priv;
 
@@ -179,7 +179,7 @@ static const struct ra_swapchain_fns d3d11_swapchain = {
     .swap_buffers = d3d11_swap_buffers,
 };
 
-static bool d3d11_init(struct ra_ctx *ctx)
+bool d3d11_init(struct ra_ctx *ctx)
 {
     struct priv *p = ctx->priv = talloc_zero(ctx, struct priv);
     p->opts = mp_get_config_group(ctx, ctx->global, &d3d11_conf);

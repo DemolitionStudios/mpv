@@ -29,3 +29,4 @@ typedef struct mpv_d3d11_init_params {
     int fake;
 } mpv_d3d11_init_params;
 
+#endif
