@@ -123,10 +123,6 @@ struct m_obj_desc {
     const char *options_prefix;
     // For free use by the implementer of m_obj_list.get_desc
     const void *p;
-    // If not NULL, options which should be set before applying other options.
-    // This member is usually set by m_obj_list_find() only, and read by the
-    // option parser. It's not used anywhere else.
-    const char *init_options;
     // Don't list entry with "help"
     bool hidden;
     // Callback to print custom help if "vf=entry=help" is passed
@@ -405,10 +401,13 @@ char *format_file_size(int64_t size);
 // Do not add as property.
 #define M_OPT_NOPROP            (1 << 6)
 
+// Enable special semantics for some options when parsing the string "help".
+#define M_OPT_HAVE_HELP         (1 << 7)
+
 // The following are also part of the M_OPT_* flags, and are used to update
 // certain groups of options.
-#define UPDATE_OPT_FIRST        (1 << 7)
-#define UPDATE_TERM             (1 << 7)  // terminal options
+#define UPDATE_OPT_FIRST        (1 << 8)
+#define UPDATE_TERM             (1 << 8)  // terminal options
 #define UPDATE_OSD              (1 << 10) // related to OSD rendering
 #define UPDATE_BUILTIN_SCRIPTS  (1 << 11) // osc/ytdl/stats
 #define UPDATE_IMGPAR           (1 << 12) // video image params overrides

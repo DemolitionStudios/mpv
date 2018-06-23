@@ -45,10 +45,13 @@ enum {
     VO_EVENT_LIVE_RESIZING              = 1 << 5,
     // Window fullscreen state changed via external influence.
     VO_EVENT_FULLSCREEN_STATE           = 1 << 6,
+    // Special thing for encode mode (vo_driver.initially_blocked).
+    // Part of VO_EVENTS_USER to make vo_is_ready_for_frame() work properly.
+    VO_EVENT_INITIAL_UNBLOCK            = 1 << 7,
 
     // Set of events the player core may be interested in.
     VO_EVENTS_USER = VO_EVENT_RESIZE | VO_EVENT_WIN_STATE |
-                     VO_EVENT_FULLSCREEN_STATE,
+                     VO_EVENT_FULLSCREEN_STATE | VO_EVENT_INITIAL_UNBLOCK,
 };
 
 enum mp_voctrl {
@@ -264,6 +267,12 @@ struct vo_driver {
     // Encoding functionality, which can be invoked via --o only.
     bool encode;
 
+    // This requires waiting for a VO_EVENT_INITIAL_UNBLOCK event before the
+    // first frame can be sent. Doing vo_reconfig*() calls is allowed though.
+    // Encode mode uses this, the core uses vo_is_ready_for_frame() to
+    // implicitly check for this.
+    bool initially_blocked;
+
     // VO_CAP_* bits
     int caps;
 
@@ -291,6 +300,12 @@ struct vo_driver {
      * returns: < 0 on error, >= 0 on success
      */
     int (*reconfig)(struct vo *vo, struct mp_image_params *params);
+
+    /*
+     * Like reconfig(), but provides the whole mp_image for which the change is
+     * required. (The image doesn't have to have real data.)
+     */
+    int (*reconfig2)(struct vo *vo, struct mp_image *img);
 
     /*
      * Control interface
@@ -328,6 +343,14 @@ struct vo_driver {
                                   int stride_align);
 
     /*
+     * Thread-safe variant of get_image. Set at most one of these callbacks.
+     * This excludes _all_ synchronization magic. The only guarantee is that
+     * vo_driver.uninit is not called before this function returns.
+     */
+    struct mp_image *(*get_image_ts)(struct vo *vo, int imgfmt, int w, int h,
+                                     int stride_align);
+
+    /*
      * Render the given frame to the VO's backbuffer. This operation will be
      * followed by a draw_osd and a flip_page[_timed] call.
      * mpi belongs to the VO; the VO must free it eventually.
@@ -340,6 +363,9 @@ struct vo_driver {
 
     /* Render the given frame. Note that this is also called when repeating
      * or redrawing frames.
+     *
+     * frame is freed by the caller, but the callee can still modify the
+     * contained data and references.
      */
     void (*draw_frame)(struct vo *vo, struct vo_frame *frame);
 
@@ -432,6 +458,7 @@ struct vo {
 struct mpv_global;
 struct vo *init_best_video_out(struct mpv_global *global, struct vo_extra *ex);
 int vo_reconfig(struct vo *vo, struct mp_image_params *p);
+int vo_reconfig2(struct vo *vo, struct mp_image *img);
 
 int vo_control(struct vo *vo, int request, void *data);
 void vo_control_async(struct vo *vo, int request, void *data);

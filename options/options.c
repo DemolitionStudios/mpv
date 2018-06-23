@@ -583,9 +583,6 @@ const m_option_t mp_opts[] = {
     OPT_STRING("force-media-title", media_title, 0),
     OPT_CHOICE_OR_INT("video-rotate", video_rotate, UPDATE_IMGPAR, 0, 359,
                       ({"no", -1})),
-    OPT_CHOICE_C("video-stereo-mode", video_stereo_mode, UPDATE_IMGPAR,
-                 mp_stereo3d_names,
-                 .deprecation_message = "mostly broken"),
 
     OPT_CHOICE_OR_INT("cursor-autohide", cursor_autohide_delay, 0,
                       0, 30000, ({"no", -1}, {"always", -2})),
@@ -761,9 +758,7 @@ const m_option_t mp_opts[] = {
     OPT_SUBSTRUCT("vaapi", vaapi_opts, vaapi_conf, 0),
 #endif
 
-#if HAVE_ENCODING
     OPT_SUBSTRUCT("", encode_opts, encode_config, 0),
-#endif
 
     OPT_REMOVED("a52drc", "use --ad-lavc-ac3drc=level"),
     OPT_REMOVED("afm", "use --ad=..."),
@@ -970,8 +965,9 @@ const struct MPOpts mp_default_opts = {
     .mf_fps = 1.0,
 
     .display_tags = (char **)(const char*[]){
-        "Artist", "Album", "Album_Artist", "Comment", "Composer", "Genre",
-        "Performer", "Title", "Track", "icy-title", "service_name",
+        "Artist", "Album", "Album_Artist", "Comment", "Composer",
+        "Date", "Description", "Genre", "Performer", "Rating",
+        "Series", "Title", "Track", "icy-title", "service_name",
         NULL
     },
 

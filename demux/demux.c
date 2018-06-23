@@ -282,6 +282,7 @@ struct demux_stream {
     bool eager;             // try to keep at least 1 packet queued
                             // if false, this stream is disabled, or passively
                             // read (like subtitles)
+    bool still_image;       // stream has still video images
     bool refreshing;        // finding old position after track switches
     bool eof;               // end of demuxed stream? (true if no more packets)
 
@@ -703,8 +704,9 @@ static void update_stream_selection_state(struct demux_internal *in,
     for (int n = 0; n < in->num_streams; n++) {
         struct demux_stream *s = in->streams[n]->ds;
 
+        s->still_image = s->sh->still_image;
         s->eager = s->selected && !s->sh->attached_picture;
-        if (s->eager) {
+        if (s->eager && !s->still_image) {
             any_av_streams |= s->type != STREAM_SUB;
             if (!master ||
                 (master->type == STREAM_VIDEO && s->type == STREAM_AUDIO))
@@ -1234,6 +1236,7 @@ static void adjust_seek_range_on_packet(struct demux_stream *ds,
 {
     struct demux_queue *queue = ds->queue;
     bool attempt_range_join = false;
+    bool prev_eof = queue->is_eof;
 
     if (!ds->in->seekable_cache)
         return;
@@ -1251,6 +1254,8 @@ static void adjust_seek_range_on_packet(struct demux_stream *ds,
             attempt_range_join = queue->range->seek_end > old_end;
             if (queue->keyframe_latest->kf_seek_pts != MP_NOPTS_VALUE)
                 add_index_entry(queue, queue->keyframe_latest);
+        } else {
+            queue->is_eof |= ds->eof;
         }
         queue->keyframe_latest = dp;
         queue->keyframe_pts = queue->keyframe_end_pts = MP_NOPTS_VALUE;
@@ -1266,11 +1271,11 @@ static void adjust_seek_range_on_packet(struct demux_stream *ds,
         queue->keyframe_pts = MP_PTS_MIN(queue->keyframe_pts, ts);
         queue->keyframe_end_pts = MP_PTS_MAX(queue->keyframe_end_pts, ts);
 
-        if (queue->is_eof) {
-            queue->is_eof = false;
-            update_seek_ranges(queue->range);
-        }
+        queue->is_eof = false;
     }
+
+    if (queue->is_eof != prev_eof)
+        update_seek_ranges(queue->range);
 
     if (attempt_range_join)
         attempt_range_joining(ds->in);
@@ -1441,9 +1446,11 @@ static bool read_packet(struct demux_internal *in)
         for (int n = 0; n < in->num_streams; n++) {
             struct demux_stream *ds = in->streams[n]->ds;
             bool eof = !ds->reader_head;
-            if (eof && ds->eof)
+            if (!ds->eof && eof) {
+                ds->eof = true;
+                adjust_seek_range_on_packet(ds, NULL);
                 wakeup_ds(ds);
-            ds->eof |= eof;
+            }
         }
         return false;
     }
@@ -1475,11 +1482,11 @@ static bool read_packet(struct demux_internal *in)
         if (eof) {
             for (int n = 0; n < in->num_streams; n++) {
                 struct demux_stream *ds = in->streams[n]->ds;
-                if (!ds->eof)
+                if (!ds->eof) {
+                    ds->eof = true;
                     adjust_seek_range_on_packet(ds, NULL);
-                ds->eof = true;
-                if (!in->last_eof && ds->wakeup_cb)
                     wakeup_ds(ds);
+                }
             }
             // If we had EOF previously, then don't wakeup (avoids wakeup loop)
             if (!in->last_eof) {
@@ -2994,7 +3001,7 @@ static int cached_demux_control(struct demux_internal *in, int cmd, void *arg)
             struct demux_stream *ds = in->streams[n]->ds;
             if (ds->eager && !(!ds->queue->head && ds->eof) && !ds->ignore_eof)
             {
-                r->underrun |= !ds->reader_head && !ds->eof;
+                r->underrun |= !ds->reader_head && !ds->eof && !ds->still_image;
                 r->ts_reader = MP_PTS_MAX(r->ts_reader, ds->base_ts);
                 r->ts_end = MP_PTS_MAX(r->ts_end, ds->queue->last_ts);
                 any_packets |= !!ds->reader_head;

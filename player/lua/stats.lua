@@ -424,7 +424,7 @@ end
 
 
 local function add_file(s)
-    append(s, "", {prefix=o.nl .. o.nl .. "File:", nl="", indent=""})
+    append(s, "", {prefix="File:", nl="", indent=""})
     append_property(s, "filename", {prefix_sep="", nl="", indent=""})
     if not (mp.get_property_osd("filename") == mp.get_property_osd("media-title")) then
         append_property(s, "media-title", {prefix="Title:"})
@@ -537,6 +537,7 @@ local function add_audio(s)
 
     append(s, "", {prefix=o.nl .. o.nl .. "Audio:", nl="", indent=""})
     append_property(s, "audio-codec", {prefix_sep="", nl="", indent=""})
+    append(s, r["format"], {prefix="Format:"})
     append(s, r["samplerate"], {prefix="Sample Rate:", suffix=" Hz"})
     append(s, r["channel-count"], {prefix="Channels:"})
     append_property(s, "packet-audio-bitrate", {prefix="Bitrate:", suffix=" kbps"})

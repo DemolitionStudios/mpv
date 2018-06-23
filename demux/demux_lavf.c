@@ -53,6 +53,9 @@
 #ifndef AV_DISPOSITION_TIMED_THUMBNAILS
 #define AV_DISPOSITION_TIMED_THUMBNAILS 0
 #endif
+#ifndef AV_DISPOSITION_STILL_IMAGE
+#define AV_DISPOSITION_STILL_IMAGE 0
+#endif
 
 #define INITIAL_PROBE_SIZE STREAM_BUFFER_SIZE
 #define PROBE_BUF_SIZE FFMIN(STREAM_MAX_BUFFER_SIZE, 2 * 1024 * 1024)
@@ -73,7 +76,6 @@ struct demux_lavf_opts {
     char *format;
     char **avopts;
     int hacks;
-    int genptsmode;
     char *sub_cp;
     int rtsp_transport;
 };
@@ -92,8 +94,6 @@ const struct m_sub_options demux_lavf_conf = {
         OPT_INTRANGE("demuxer-lavf-probescore", probescore, 0,
                      1, AVPROBE_SCORE_MAX),
         OPT_FLAG("demuxer-lavf-hacks", hacks, 0),
-        OPT_CHOICE("demuxer-lavf-genpts-mode", genptsmode, 0,
-                   ({"lavf", 1}, {"no", 0})),
         OPT_KEYVALUELIST("demuxer-lavf-o", avopts, 0),
         OPT_STRING("sub-codepage", sub_cp, 0),
         OPT_CHOICE("rtsp-transport", rtsp_transport, 0,
@@ -183,8 +183,6 @@ static const struct format_hack format_hacks[] = {
     BLACKLIST("bin"),
     // Useless, does not work with custom streams.
     BLACKLIST("image2"),
-    // Probably a security risk.
-    BLACKLIST("ffm"),
     // Image demuxers ("<name>_pipe" is detected explicitly)
     {"image2pipe", .image_format = true},
     {0}
@@ -715,6 +713,10 @@ static void handle_new_stream(demuxer_t *demuxer, int i)
             sh->default_track = true;
         if (st->disposition & AV_DISPOSITION_FORCED)
             sh->forced_track = true;
+        if (st->disposition & AV_DISPOSITION_DEPENDENT)
+            sh->dependent_track = true;
+        if (st->disposition & AV_DISPOSITION_STILL_IMAGE)
+            sh->still_image = true;
         if (priv->format_hack.use_stream_ids)
             sh->demuxer_id = st->id;
         AVDictionaryEntry *title = av_dict_get(st->metadata, "title", NULL, 0);
@@ -724,10 +726,8 @@ static void handle_new_stream(demuxer_t *demuxer, int i)
             sh->title = talloc_asprintf(sh, "visual impaired");
         if (!sh->title && st->disposition & AV_DISPOSITION_HEARING_IMPAIRED)
             sh->title = talloc_asprintf(sh, "hearing impaired");
-        if (st->disposition & AV_DISPOSITION_DEPENDENT)
-            sh->dependent_track = true;
         AVDictionaryEntry *lang = av_dict_get(st->metadata, "language", NULL, 0);
-        if (lang && lang->value)
+        if (lang && lang->value && strcmp(lang->value, "und") != 0)
             sh->lang = talloc_strdup(sh, lang->value);
         sh->hls_bitrate = dict_get_decimal(st->metadata, "variant_bitrate", 0);
         if (!sh->title && sh->hls_bitrate > 0)
@@ -811,8 +811,6 @@ static int demux_open_lavf(demuxer_t *demuxer, enum demux_check check)
     if (!avfc)
         return -1;
 
-    if (lavfdopts->genptsmode)
-        avfc->flags |= AVFMT_FLAG_GENPTS;
     if (index_mode != 1)
         avfc->flags |= AVFMT_FLAG_IGNIDX;
 

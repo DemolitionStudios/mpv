@@ -1153,6 +1153,9 @@ static void dispatch_compute(struct gl_video *p, int w, int h,
     int num_x = info.block_w > 0 ? (w + info.block_w - 1) / info.block_w : 1,
         num_y = info.block_h > 0 ? (h + info.block_h - 1) / info.block_h : 1;
 
+    if (!(p->ra->caps & RA_CAP_NUM_GROUPS))
+        PRELUDE("#define gl_NumWorkGroups uvec3(%d, %d, 1)\n", num_x, num_y);
+
     pass_record(p, gl_sc_dispatch_compute(p->sc, num_x, num_y, 1));
     cleanup_binds(p);
 }
@@ -2628,7 +2631,7 @@ static void pass_draw_osd(struct gl_video *p, int draw_flags, double pts,
     if ((draw_flags & OSD_DRAW_SUB_ONLY) && (draw_flags & OSD_DRAW_OSD_ONLY))
         return;
 
-    mpgl_osd_generate(p->osd, rect, pts, p->image_params.stereo_out, draw_flags);
+    mpgl_osd_generate(p->osd, rect, pts, p->image_params.stereo3d, draw_flags);
 
     timer_pool_start(p->osd_timer);
     for (int n = 0; n < MAX_OSD_PARTS; n++) {
@@ -3294,7 +3297,7 @@ void gl_video_resize(struct gl_video *p,
     gl_video_reset_surfaces(p);
 
     if (p->osd)
-        mpgl_osd_resize(p->osd, p->osd_rect, p->image_params.stereo_out);
+        mpgl_osd_resize(p->osd, p->osd_rect, p->image_params.stereo3d);
 }
 
 static void frame_perf_data(struct pass_info pass[], struct mp_frame_perf *out)
@@ -3515,25 +3518,35 @@ static void check_gl_features(struct gl_video *p)
     bool have_compute = ra->caps & RA_CAP_COMPUTE;
     bool have_ssbo = ra->caps & RA_CAP_BUF_RW;
     bool have_fragcoord = ra->caps & RA_CAP_FRAGCOORD;
-    bool have_numgroups = ra->caps & RA_CAP_NUM_GROUPS;
 
     const char *auto_fbo_fmts[] = {"rgba16", "rgba16f", "rgba16hf",
                                    "rgb10_a2", "rgba8", 0};
     const char *user_fbo_fmts[] = {p->opts.fbo_format, 0};
     const char **fbo_fmts = user_fbo_fmts[0] && strcmp(user_fbo_fmts[0], "auto")
                           ? user_fbo_fmts : auto_fbo_fmts;
+    bool user_specified_fbo_fmt = fbo_fmts == user_fbo_fmts;
+    bool fbo_test_result = false;
     bool have_fbo = false;
     p->fbo_format = NULL;
     for (int n = 0; fbo_fmts[n]; n++) {
         const char *fmt = fbo_fmts[n];
         const struct ra_format *f = ra_find_named_format(p->ra, fmt);
-        if (!f && fbo_fmts == user_fbo_fmts)
+        if (!f && user_specified_fbo_fmt)
             MP_WARN(p, "FBO format '%s' not found!\n", fmt);
-        if (f && f->renderable && f->linear_filter && test_fbo(p, f)) {
+        if (f && f->renderable && f->linear_filter &&
+            (fbo_test_result = test_fbo(p, f))) {
             MP_VERBOSE(p, "Using FBO format %s.\n", f->name);
             have_fbo = true;
             p->fbo_format = f;
             break;
+        }
+
+        if (user_specified_fbo_fmt) {
+            MP_WARN(p, "User-specified FBO format '%s' failed to initialize! "
+                       "(exists=%d, renderable=%d, linear_filter=%d, "
+                       "fbo_test_result=%d)\n",
+                    fmt, !!f, f ? f->renderable : 0,  f ? f->linear_filter : 0,
+                    fbo_test_result);
         }
     }
 
@@ -3548,11 +3561,18 @@ static void check_gl_features(struct gl_video *p)
         // Verbose, since this is the default setting
         MP_VERBOSE(p, "Disabling alpha checkerboard (no gl_FragCoord).\n");
     }
+    if (!have_fbo && have_compute) {
+        have_compute = false;
+        MP_WARN(p, "Force-disabling compute shaders as an FBO format was not "
+                   "available! See your FBO format configuration!\n");
+    }
 
-    bool have_compute_peak = have_compute && have_ssbo && have_numgroups;
+    bool have_compute_peak = have_compute && have_ssbo;
     if (!have_compute_peak && p->opts.compute_hdr_peak >= 0) {
         int msgl = p->opts.compute_hdr_peak == 1 ? MSGL_WARN : MSGL_V;
-        MP_MSG(p, msgl, "Disabling HDR peak computation (no compute shaders).\n");
+        MP_MSG(p, msgl, "Disabling HDR peak computation (one or more of the "
+                        "following is not supported: compute shaders=%d, "
+                        "SSBO=%d).\n", have_compute, have_ssbo);
         p->opts.compute_hdr_peak = -1;
     }
 

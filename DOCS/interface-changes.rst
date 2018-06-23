@@ -75,10 +75,10 @@ Interface changes
       pad must be connected either to another filter, or to a video/audio track
       or video/audio output). If they are disconnected at runtime, the stream
       will probably stall.
-    - deprecate the OpenGL cocoa backend, option choice --gpu-context=cocoa
-      when used with --gpu-api=opengl (use --vo=opengl-cb)
     - rename --vo=opengl-cb to --vo=libmpv (goes in hand with the opengl-cb
       API deprecation, see client-api-changes.rst)
+    - deprecate the OpenGL cocoa backend, option choice --gpu-context=cocoa
+      when used with --gpu-api=opengl (use --vo=libmpv)
     - make --deinterlace=yes always deinterlace, instead of trying to check
       certain unreliable video metadata. Also flip the defaults of all builtin
       HW deinterlace filters to always deinterlace.
@@ -94,6 +94,19 @@ Interface changes
       the future. (This kind of waiting was always a feature to prevent that
       playback is started while scripts are only half-loaded.)
     - deprecate --ovoffset, --oaoffset, --ovfirst, --oafirst
+    - remove the following encoding options: --ocopyts (now the default, old
+      timestamp handling is gone), --oneverdrop (now default), --oharddup (you
+      need to use --vf=fps=VALUE), --ofps, --oautofps, --omaxfps
+    - remove --video-stereo-mode. This option was broken out of laziness, and
+      nobody wants to fix it. Automatic 3D down-conversion to 2D is also broken,
+      although you can just insert the stereo3d filter manually. The obscurity
+      of 3D content doesn't justify such an option anyway.
+    - change cycle-values command to use the current value, instead of an
+      internal counter that remembered the current position.
+    - edition and disc title switching will now fully reload playback (may have
+      consequences for scripts, client API, or when using file-local options)
+    - remove deprecated ao/vo auto profiles. Consider using scripts like
+      auto-profiles.lua instead.
  --- mpv 0.28.0 ---
     - rename --hwdec=mediacodec option to mediacodec-copy, to reflect
       conventions followed by other hardware video decoding APIs

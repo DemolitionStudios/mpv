@@ -118,11 +118,11 @@ def build(ctx):
 
     if ctx.dependency_satisfied('wayland'):
         ctx.wayland_protocol_code(proto_dir = ctx.env.WL_PROTO_DIR,
-            protocol  = "unstable/xdg-shell/xdg-shell-unstable-v6",
-            target    = "video/out/wayland/xdg-shell-v6.c")
+            protocol  = "stable/xdg-shell/xdg-shell",
+            target    = "video/out/wayland/xdg-shell.c")
         ctx.wayland_protocol_header(proto_dir = ctx.env.WL_PROTO_DIR,
-            protocol  = "unstable/xdg-shell/xdg-shell-unstable-v6",
-            target    = "video/out/wayland/xdg-shell-v6.h")
+            protocol  = "stable/xdg-shell/xdg-shell",
+            target    = "video/out/wayland/xdg-shell.h")
         ctx.wayland_protocol_code(proto_dir = ctx.env.WL_PROTO_DIR,
             protocol  = "unstable/idle-inhibit/idle-inhibit-unstable-v1",
             target    = "video/out/wayland/idle-inhibit-v1.c")
@@ -153,13 +153,6 @@ def build(ctx):
                '-I. -I..') % (ctx.env.SWIFT, ctx.env.SWIFT_FLAGS, module,
                               bridge, header, tgt, src)
         return task.exec_command(cmd)
-
-    if ctx.dependency_satisfied('cocoa') and ctx.env.MACOS_SDK:
-        # on macOS we explicitly need to set the SDK path, otherwise it can lead to
-        # linking warnings or errors
-        ctx.env.append_value('LINKFLAGS', [
-            '-isysroot', ctx.env.MACOS_SDK
-        ])
 
     if ctx.dependency_satisfied('macos-cocoa-cb'):
         swift_source = [
@@ -241,7 +234,7 @@ def build(ctx):
         ( "audio/out/ao_coreaudio_utils.c",      "audiounit" ),
         ( "audio/out/ao_coreaudio_utils.c",      "coreaudio" ),
         ( "audio/out/ao_jack.c",                 "jack" ),
-        ( "audio/out/ao_lavc.c",                 "encoding" ),
+        ( "audio/out/ao_lavc.c" ),
         ( "audio/out/ao_null.c" ),
         ( "audio/out/ao_openal.c",               "openal" ),
         ( "audio/out/ao_opensles.c",             "opensles" ),
@@ -262,7 +255,7 @@ def build(ctx):
         ( "common/av_log.c" ),
         ( "common/codecs.c" ),
         ( "common/common.c" ),
-        ( "common/encode_lavc.c",                "encoding" ),
+        ( "common/encode_lavc.c" ),
         ( "common/msg.c" ),
         ( "common/playlist.c" ),
         ( "common/recorder.c" ),
@@ -306,8 +299,7 @@ def build(ctx):
         ( "filters/user_filters.c" ),
 
         ## Input
-        ( "input/cmd_list.c" ),
-        ( "input/cmd_parse.c" ),
+        ( "input/cmd.c" ),
         ( "input/event.c" ),
         ( "input/input.c" ),
         ( "input/ipc.c" ),
@@ -429,6 +421,7 @@ def build(ctx):
         ( "video/out/d3d11/libmpv_d3d11.c",      "d3d11" ),
         ( "video/out/d3d11/ra_d3d11.c",          "d3d11" ),
         ( "video/out/dither.c" ),
+        ( "video/out/dr_helper.c" ),
         ( "video/out/drm_atomic.c",              "drm" ),
         ( "video/out/drm_common.c",              "drm" ),
         ( "video/out/drm_prime.c",               "drm && drmprime" ),
@@ -484,7 +477,7 @@ def build(ctx):
         ( "video/out/vo_drm.c",                  "drm" ),
         ( "video/out/vo_gpu.c" ),
         ( "video/out/vo_image.c" ),
-        ( "video/out/vo_lavc.c",                 "encoding" ),
+        ( "video/out/vo_lavc.c" ),
         ( "video/out/vo_libmpv.c" ),
         ( "video/out/vo_mediacodec_embed.c",     "android" ),
         ( "video/out/vo_null.c" ),
@@ -507,7 +500,7 @@ def build(ctx):
         ( "video/out/w32_common.c",              "win32-desktop" ),
         ( "video/out/wayland/idle-inhibit-v1.c", "wayland" ),
         ( "video/out/wayland/srv-decor.c",       "wayland" ),
-        ( "video/out/wayland/xdg-shell-v6.c",    "wayland" ),
+        ( "video/out/wayland/xdg-shell.c",       "wayland" ),
         ( "video/out/wayland_common.c",          "wayland" ),
         ( "video/out/win32/displayconfig.c",     "win32-desktop" ),
         ( "video/out/win32/droptarget.c",        "win32-desktop" ),
@@ -685,11 +678,15 @@ def build(ctx):
             _build_libmpv(False)
 
         def get_deps():
-            res = ""
+            res = []
             for k in ctx.env.keys():
-                if k.startswith("LIB_") and k != "LIB_ST":
-                    res += " ".join(["-l" + x for x in ctx.env[k]]) + " "
-            return res
+                if (k.startswith("LIB_") and k != "LIB_ST") \
+                or (k.startswith("STLIB_") and k != "STLIB_ST" and k != "STLIB_MARKER"):
+                    for l in ctx.env[k]:
+                        if l in res:
+                            res.remove(l)
+                        res.append(l)
+            return " ".join(["-l" + l for l in res])
 
         ctx(
             target       = 'libmpv/mpv.pc',
@@ -730,8 +727,7 @@ def build(ctx):
             ctx.env.DATADIR + '/applications',
             ['etc/mpv.desktop'] )
 
-        if ctx.dependency_satisfied('encoding'):
-            ctx.install_files(ctx.env.CONFDIR, ['etc/encoding-profiles.conf'] )
+        ctx.install_files(ctx.env.CONFDIR, ['etc/encoding-profiles.conf'] )
 
         for size in '16x16 32x32 64x64'.split():
             ctx.install_as(

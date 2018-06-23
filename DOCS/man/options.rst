@@ -64,17 +64,6 @@ Track Selection
     streamed with youtube-dl, because it saves bandwidth. This is done by
     setting the ytdl_format to "bestaudio/best" in the ytdl_hook.lua script.
 
-``--ff-aid=<ID|auto|no>``, ``--ff-sid=<ID|auto|no>``, ``--ff-vid=<ID|auto|no>``
-    Select audio/subtitle/video streams by the FFmpeg stream index. The FFmpeg
-    stream index is relatively arbitrary, but useful when interacting with
-    other software using FFmpeg (consider ``ffprobe``).
-
-    Note that with external tracks (added with ``--sub-files`` and similar
-    options), there will be streams with duplicate IDs. In this case, the
-    first stream in order is selected.
-
-    Deprecated.
-
 ``--edition=<ID|auto>``
     (Matroska files only)
     Specify the edition (set of chapters) to use, where 0 is the first. If set
@@ -899,19 +888,6 @@ Video
     older hardware. d3d11va can always use ``yuv420p``, which uses an opaque
     format, with likely no advantages.
 
-``--videotoolbox-format=<name>``
-    Set the internal pixel format used by ``--hwdec=videotoolbox`` on OSX. The
-    choice of the format can influence performance considerably. On the other
-    hand, there doesn't appear to be a good way to detect the best format for
-    the given hardware. ``nv12``, the default, works better on modern hardware,
-    while ``uyvy422`` appears to be better for old hardware. ``yuv420p`` also
-    works.
-    Since mpv 0.25.0, ``no`` is an accepted value, which lets the decoder pick
-    the format on newer FFmpeg versions (will use ``nv12`` on older versions).
-
-    Deprecated. Use ``--hwdec-image-format`` if you really need this. If both
-    are specified, ``--hwdec-image-format`` wins.
-
 ``--cuda-decode-device=<auto|0..>``
     Choose the GPU device used for decoding when using the ``cuda`` hwdec.
 
@@ -1044,8 +1020,8 @@ Video
     determined using a fixed framerate value (either using the ``--fps``
     option, or using file information). Sometimes, files with very broken
     timestamps can be played somewhat well in this mode. Note that video
-    filters, subtitle rendering and audio synchronization can be completely
-    broken in this mode.
+    filters, subtitle rendering, seeking (including hr-seeks and backstepping),
+    and audio synchronization can be completely broken in this mode.
 
 ``--fps=<float>``
     Override video framerate. Useful if the original value is wrong or missing.
@@ -1134,21 +1110,18 @@ Video
     N frames fail to decode in a row. 1 is equivalent to ``yes``.
 
 ``--vd-lavc-dr=<yes|no>``
-    Enable direct rendering (default: no). If this is set to ``yes``, the
+    Enable direct rendering (default: yes). If this is set to ``yes``, the
     video will be decoded directly to GPU video memory (or staging buffers).
     This can speed up video upload, and may help with large resolutions or
     slow hardware. This works only with the following VOs:
 
-        - ``gpu``: requires at least OpenGL 4.4.
+        - ``gpu``: requires at least OpenGL 4.4 or Vulkan.
 
-    (In particular, this can't be made work with ``opengl-cb``.)
+    (In particular, this can't be made work with ``opengl-cb``, but the libmpv
+    render API has optional support.)
 
     Using video filters of any kind that write to the image data (or output
     newly allocated frames) will silently disable the DR code path.
-
-    There are some corner cases that will result in undefined behavior (crashes
-    and other strange behavior) if this option is enabled. These are pending
-    towards being fixed properly at a later point.
 
 ``--vd-lavc-bitexact``
     Only use bit-exact algorithms in all decoding steps (for codec testing).
@@ -2252,7 +2225,7 @@ Window
 
     .. admonition:: Note (X11)
 
-        This option does works properly only with window managers which
+        This option works properly only with window managers which
         understand the EWMH ``_NET_WM_FULLSCREEN_MONITORS`` hint.
 
     .. admonition:: Note (OS X)
@@ -2573,8 +2546,7 @@ Window
     always re-enabled when the player is paused.
 
     This is not supported on all video outputs or platforms. Sometimes it is
-    implemented, but does not work (known to happen with GNOME). You might be
-    able to work around this using ``--heartbeat-cmd`` instead.
+    implemented, but does not work (especially with Linux "desktops").
 
 ``--wid=<ID>``
     This tells mpv to attach to an existing window. If a VO is selected that
@@ -2791,12 +2763,6 @@ Demuxer
     imperfect behavior from libavformat demuxers. Passing ``no`` disables
     these. For debugging and testing only.
 
-``--demuxer-lavf-genpts-mode=<no|lavf>``
-    Mode for deriving missing packet PTS values from packet DTS. ``lavf``
-    enables libavformat's ``genpts`` option. ``no`` disables it. This used
-    to be enabled by default, but then it was deemed as not needed anymore.
-    Enabling this might help with timestamp problems, or make them worse.
-
 ``--demuxer-lavf-o=<key>=<value>[,<key>=<value>[,...]]``
     Pass AVOptions to libavformat demuxer.
 
@@ -2964,8 +2930,7 @@ Demuxer
 
     Keep in mind that some events can flush the cache or force a low level
     seek anyway, such as switching tracks, or attempting to seek before the
-    start or after the end of the file. This option is experimental - thus
-    disabled, and bugs are to be expected.
+    start or after the end of the file.
 
     The special value ``auto`` means ``yes`` in the same situation as
     ``--cache-secs`` is used (i.e. when the stream appears to be a network
@@ -2973,9 +2938,12 @@ Demuxer
 
 ``--demuxer-thread=<yes|no>``
     Run the demuxer in a separate thread, and let it prefetch a certain amount
-    of packets (default: yes). Having this enabled may lead to smoother
-    playback, but on the other hand can add delays to seeking or track
-    switching.
+    of packets (default: yes). Having this enabled leads to smoother playback,
+    enables features like prefetching, and prevents that stuck network freezes
+    the player. On the other hand, it can add overhead, or the background
+    prefetching can hog CPU resources.
+
+    Disabling this option is not recommended. Use it for debugging only.
 
 ``--demuxer-readahead-secs=<seconds>``
     If ``--demuxer-thread`` is enabled, this controls how much the demuxer
@@ -4019,6 +3987,13 @@ Network
             Field2: value2
             Connection: close
 
+``--http-proxy=<proxy>``
+    URL of the HTTP/HTTPS proxy. If this is set, the ``http_proxy`` environment
+    is ignored. The ``no_proxy`` environment variable is still respected. This
+    option is silently ignored if it does not start with ``http://``. Proxies
+    are not used for https URLs. Setting this option does not try to make the
+    ytdl script use the proxy.
+
 ``--tls-ca-file=<filename>``
     Certificate authority database file for use with TLS. (Silently fails with
     older FFmpeg or Libav versions.)
@@ -4769,7 +4744,7 @@ The following video options are currently all specific to ``--vo=gpu`` and
 
 ``--deband``
     Enable the debanding algorithm. This greatly reduces the amount of visible
-    banding, blocking and other quantization artifacts, at the expensive of
+    banding, blocking and other quantization artifacts, at the expense of
     very slightly blurring some of the finest details. In practice, it's
     virtually always an improvement - the only reason to disable it would be
     for performance.
@@ -5067,7 +5042,9 @@ The following video options are currently all specific to ``--vo=gpu`` and
     are:
 
     auto
-        Disable any adaptation (default)
+        Disable any adaptation, except for atypical color spaces. Specifically,
+        wide/unusual gamuts get automatically adapted to BT.709, while standard
+        gamut (i.e. BT.601 and BT.709) content is not touched. (default)
     bt.470m
         ITU-R BT.470 M
     bt.601-525
@@ -5099,7 +5076,9 @@ The following video options are currently all specific to ``--vo=gpu`` and
     Valid values are:
 
     auto
-        Disable any adaptation (default)
+        Disable any adaptation, except for atypical transfers. Specifically,
+        HDR or linear light source material gets automatically converted to
+        gamma 2.2, while SDR content is not touched. (default)
     bt.1886
         ITU-R BT.1886 curve (assuming infinite contrast)
     srgb
@@ -5305,7 +5284,7 @@ The following video options are currently all specific to ``--vo=gpu`` and
     Size of the 3D LUT generated from the ICC profile in each dimension.
     Default is 64x64x64. Sizes may range from 2 to 512.
 
-``--icc-contrast=<0-100000>``
+``--icc-contrast=<0-1000000>``
     Specifies an upper limit on the target device's contrast ratio. This is
     detected automatically from the profile if possible, but for some profiles
     it might be missing, causing the contrast to be assumed as infinite. As a

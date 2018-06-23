@@ -43,7 +43,6 @@ enum stop_play_reason {
     PT_NEXT_ENTRY,      // prepare to play next entry in playlist
     PT_CURRENT_ENTRY,   // prepare to play mpctx->playlist->current
     PT_STOP,            // stop playback, clear playlist
-    PT_RELOAD_FILE,     // restart playback
     PT_QUIT,            // stop playback, quit player
     PT_ERROR,           // play next playlist entry (due to an error)
 };
@@ -180,6 +179,8 @@ struct vo_chain {
     // - video consists of a single picture, which should be shown only once
     // - do not sync audio to video in any way
     bool is_coverart;
+    // - video consists of sparse still images
+    bool is_sparse;
 };
 
 // Like vo_chain, for audio.

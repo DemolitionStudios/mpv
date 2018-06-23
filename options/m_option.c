@@ -1552,6 +1552,9 @@ static int parse_keyvalue_list(struct mp_log *log, const m_option_t *opt,
     bool append = false;
     bool full_value = false;
 
+    if ((opt->flags & M_OPT_HAVE_HELP) && bstr_equals0(param, "help"))
+        param = bstr0("help=");
+
     if (bstr_endswith0(name, "-add")) {
         append = true;
     } else if (bstr_endswith0(name, "-append")) {
@@ -3014,15 +3017,6 @@ static int parse_obj_settings(struct mp_log *log, struct bstr opt, int op,
         }
         desc = (struct m_obj_desc){0};
         skip = true;
-    }
-
-    if (_ret && desc.init_options) {
-        struct m_config *config = m_config_from_obj_desc_noalloc(NULL, log, &desc);
-        bstr s = bstr0(desc.init_options);
-        m_obj_parse_sub_config(log, opt, str, &s, config,
-                               M_SETOPT_CHECK_ONLY, nopos, NULL, list, &plist);
-        assert(s.len == 0);
-        talloc_free(config);
     }
 
     if (has_param) {

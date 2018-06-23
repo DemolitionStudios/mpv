@@ -1,6 +1,7 @@
 #include "config.h"
 #include "hwdec.h"
 #include "libmpv_gpu.h"
+#include "libmpv/render_gl.h"
 #include "video.h"
 #include "video/out/libmpv.h"
 
@@ -33,6 +34,14 @@ static const struct native_resource_entry native_resource_map[] = {
     [MPV_RENDER_PARAM_WL_DISPLAY] = {
         .name = "wl",
         .size = 0,
+    },
+    [MPV_RENDER_PARAM_DRM_DISPLAY] = {
+        .name = "drm_params",
+        .size = sizeof (mpv_opengl_drm_params),
+    },
+    [MPV_RENDER_PARAM_DRM_OSD_SIZE] = {
+        .name = "drm_osd_size",
+        .size = sizeof (mpv_opengl_drm_osd_size),
     },
 };
 
@@ -185,6 +194,22 @@ static int render(struct render_backend *ctx, mpv_render_param *params,
     return 0;
 }
 
+static struct mp_image *get_image(struct render_backend *ctx, int imgfmt,
+                                  int w, int h, int stride_align)
+{
+    struct priv *p = ctx->priv;
+
+    return gl_video_get_image(p->renderer, imgfmt, w, h, stride_align);
+}
+
+static void screenshot(struct render_backend *ctx, struct vo_frame *frame,
+                       struct voctrl_screenshot *args)
+{
+    struct priv *p = ctx->priv;
+
+    gl_video_screenshot(p->renderer, frame, args);
+}
+
 static void destroy(struct render_backend *ctx)
 {
     struct priv *p = ctx->priv;
@@ -211,5 +236,7 @@ const struct render_backend_fns render_backend_gpu = {
     .resize = resize,
     .get_target_size = get_target_size,
     .render = render,
+    .get_image = get_image,
+    .screenshot = screenshot,
     .destroy = destroy,
 };
